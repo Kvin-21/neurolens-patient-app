@@ -1,16 +1,24 @@
-# neurolens_patient
+# NeuroLens Patient
 
-A new Flutter project.
+Patient app for daily voice recording sessions for Neurolens.
 
-## Getting Started
+## Setup
 
-This project is a starting point for a Flutter application.
+1. Install Flutter 3.4.3+
+2. Clone: `git clone https://github.com/Kvin-21/neurolens-patient.git`
+3. Install deps: `flutter pub get`
+4. Run: `flutter run`
 
-A few resources to get you started if this is your first Flutter project:
+## Requirements
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Android 7.0+
+- Microphone permission
+- ~100MB storage
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## How It Works
+
+Patients answer 5 simple questions each day. Audio is saved locally as WAV files. A notification reminds them at 10am. Audio files are sent to backend ML models for output of MMSE scores
+
+## Privacy
+
+All processing happens on-device. Nothing identifiable leaves the phone.
