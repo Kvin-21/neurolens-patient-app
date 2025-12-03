@@ -65,7 +65,7 @@ class AudioService {
         await _recorder!.startRecorder(
           toFile: _currentFilePath,
           codec: Codec.pcm16WAV,
-          sampleRate: 22050,
+          sampleRate: 44100,
         );
         _isRecording = true;
       }
@@ -113,13 +113,15 @@ class AudioService {
     }
   }
 
+  /// Estimates duration from file size. WAV headers are 44 bytes.
   Future<double> getAudioDuration(String filePath) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return 0.0;
 
       final bytes = await file.length();
-      final duration = (bytes - 20) / 17640.0;
+      // 44100 Hz * 2 bytes * 2 channels = 176400 bytes per second
+      final duration = (bytes - 44) / 176400.0;
       return duration > 0 ? duration : 0.0;
     } catch (e) {
       debugPrint('Error getting duration: $e');

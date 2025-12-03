@@ -35,7 +35,7 @@ class NotificationService {
   }
 
   /// Schedules a daily notification at the given time.
-  Future<void> scheduleDailyNotification({int hour = 22, int minute = 0}) async {
+  Future<void> scheduleDailyNotification({int hour = 10, int minute = 0}) async {
     await initialize();
 
     final hasPermission = await requestPermission();
