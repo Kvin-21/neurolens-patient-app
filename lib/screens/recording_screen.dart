@@ -22,6 +22,7 @@ class RecordingScreen extends StatefulWidget {
 }
 
 class _RecordingScreenState extends State<RecordingScreen> {
+  late AudioService _audio;
   StorageService? _storage;
   late MLInterfaceService _ml;
 
@@ -119,6 +120,30 @@ class _RecordingScreenState extends State<RecordingScreen> {
     }
   }
 
+  Future<void> _stopAndSave() async {
+    try {
+      final path = await _audio.stop();
+      if (path == null) return;
+
+      final duration = await _audio.getAudioDuration(path);
+      final updated = _recordings[_questionIndex].copyWith(
+        audioFile: path,
+        durationSeconds: duration,
+      );
+
+      setState(() {
+        _recordings[_questionIndex] = updated;
+        _isRecording = false;
+      });
+
+      await _persistSession();
+      if (mounted) _showToast('Recording saved ✓', Colors.green);
+    } catch (e) {
+      setState(() => _isRecording = false);
+      if (mounted) _showToast('Error: $e', Colors.red);
+    }
+  }
+
   Future<void> _persistSession() async {
     if (_patientId == null || _storage == null) return;
 
@@ -184,6 +209,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
       if (!mounted) return;
       Navigator.of(context).pop(); // close dialog
 
+      final tomorrow = DateTime(now.year, now.month, now.day + 1, 10);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ThankYouScreen(nextSessionTime: tomorrow)),
       );
     } catch (e) {
       if (mounted) {
