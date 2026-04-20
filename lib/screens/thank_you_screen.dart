@@ -1,34 +1,64 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../services/background_upload_service.dart';
 import 'recording_screen.dart';
 
-const _primaryPurple = Color(0xFF667eea);
-const _accentPurple = Color(0xFF764ba2);
+const _primaryTeal = Color(0xFF4DA8A2);
+const _warmBeige = Color(0xFFF5F0EB);
+const _darkText = Color(0xFF2D3436);
 
-/// Shown after completing a session; displays countdown to next available slot.
 class ThankYouScreen extends StatefulWidget {
   final DateTime nextSessionTime;
 
-  const ThankYouScreen({super.key, required this.nextSessionTime});
+  final String? sessionManifestPath;
+
+  const ThankYouScreen({
+    super.key,
+    required this.nextSessionTime,
+    this.sessionManifestPath,
+  });
 
   @override
   State<ThankYouScreen> createState() => _ThankYouScreenState();
 }
 
-class _ThankYouScreenState extends State<ThankYouScreen> {
+class _ThankYouScreenState extends State<ThankYouScreen>
+    with SingleTickerProviderStateMixin {
   Timer? _countdownTimer;
   String _remaining = '';
+  bool _uploadScheduled = false;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeController.forward();
     _updateRemaining();
     _startCountdown();
+    _scheduleUpload();
+  }
+
+  Future<void> _scheduleUpload() async {
+    final path = widget.sessionManifestPath;
+    if (path == null || _uploadScheduled) return;
+    _uploadScheduled = true;
+    try {
+      await BackgroundUploadService.scheduleUpload(path);
+    } catch (e) {
+      debugPrint('[NeuroLens] Could not schedule upload: $e');
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -36,13 +66,17 @@ class _ThankYouScreenState extends State<ThankYouScreen> {
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateRemaining();
 
-      // Redirect once the window opens.
       final now = DateTime.now();
       if (!now.isBefore(widget.nextSessionTime)) {
         _countdownTimer?.cancel();
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const RecordingScreen()),
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const RecordingScreen(),
+              transitionsBuilder: (_, a, __, child) =>
+                  FadeTransition(opacity: a, child: child),
+              transitionDuration: const Duration(milliseconds: 400),
+            ),
           );
         }
       }
@@ -75,97 +109,107 @@ class _ThankYouScreenState extends State<ThankYouScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_primaryPurple, _accentPurple],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_warmBeige, Color(0xFFE8E0D8)],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 30,
-                          spreadRadius: 10,
-                        ),
-                      ],
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: _primaryTeal.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check_circle, size: 72, color: _primaryTeal),
+                          ),
+                          const SizedBox(height: 28),
+                          const Text(
+                            'Thank You!',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                              color: _darkText,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Your responses have been securely sent',
+                            style: TextStyle(fontSize: 17, color: _darkText.withOpacity(0.55)),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 36),
+                          Container(
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              color: _primaryTeal.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Next Session',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _darkText.withOpacity(0.5),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'Tomorrow at 10:00 AM',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: _darkText,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'in $_remaining',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    color: _primaryTeal,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'You will receive a notification',
+                            style: TextStyle(fontSize: 13, color: _darkText.withOpacity(0.4)),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.check_circle, size: 100, color: Colors.green),
-                        const SizedBox(height: 32),
-                        const Text(
-                          'Thank You!',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: _primaryPurple,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Your recordings have been saved',
-                          style: TextStyle(fontSize: 18, color: Colors.grey.shade700),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 40),
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: _primaryPurple.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Next Session',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Tomorrow at 10:00 AM',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: _primaryPurple,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'in $_remaining',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          'You will receive a notification',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

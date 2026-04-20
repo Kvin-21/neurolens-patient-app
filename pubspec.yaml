@@ -17,6 +17,12 @@ dependencies:
   flutter_local_notifications: ^17.0.0
   intl: ^0.19.0
   url_launcher: ^6.2.5
+  # Backend connectivity and security
+  dio: ^5.4.3
+  flutter_secure_storage: ^9.2.2
+  workmanager: ^0.7.0
+  encrypt: ^5.0.3
+  pointycastle: ^3.9.1
 
 dev_dependencies:
   flutter_test:

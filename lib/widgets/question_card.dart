@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-const _primaryPurple = Color(0xFF667eea);
+const _primaryTeal = Color(0xFF4DA8A2);
+const _darkText = Color(0xFF2D3436);
 
-/// Displays the current question text in a styled card.
 class QuestionCard extends StatelessWidget {
   final String questionText;
   final int questionNumber;
@@ -15,7 +15,6 @@ class QuestionCard extends StatelessWidget {
     required this.totalQuestions,
   });
 
-  /// Scale font down for longer questions to keep card compact.
   double _fontSize(int len) {
     if (len < 30) return 24;
     if (len < 50) return 22;
@@ -31,21 +30,21 @@ class QuestionCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, spreadRadius: 5),
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, 6)),
           ],
         ),
         child: Column(
           children: [
             Text(
               'Question $questionNumber of $totalQuestions',
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: _primaryPurple,
-                letterSpacing: 1.2,
+                color: _primaryTeal.withOpacity(0.8),
+                letterSpacing: 1.0,
               ),
             ),
             const SizedBox(height: 20),
@@ -54,8 +53,8 @@ class QuestionCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: _fontSize(questionText.length),
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
-                height: 1.4,
+                color: _darkText,
+                height: 1.45,
               ),
               textAlign: TextAlign.center,
             ),

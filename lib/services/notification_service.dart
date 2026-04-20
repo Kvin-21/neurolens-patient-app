@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -56,7 +57,26 @@ class NotificationService {
 
     debugPrint('Scheduling notification for: $scheduled');
 
-    await _plugin.zonedSchedule(
+    try {
+      await _scheduleDailyNotification(scheduled, AndroidScheduleMode.exactAllowWhileIdle);
+    } on PlatformException catch (e) {
+      final code = e.code.toLowerCase();
+      final message = (e.message ?? '').toLowerCase();
+      final isExactAlarmError = code == 'exact_alarms_not_permitted' ||
+          message.contains('exact alarms are not permitted');
+      if (!isExactAlarmError) rethrow;
+      debugPrint('Exact alarms not permitted; using inexact schedule mode');
+      await _scheduleDailyNotification(scheduled, AndroidScheduleMode.inexactAllowWhileIdle);
+    }
+
+    debugPrint('Daily notification scheduled successfully');
+  }
+
+  Future<void> _scheduleDailyNotification(
+    tz.TZDateTime scheduled,
+    AndroidScheduleMode scheduleMode,
+  ) {
+    return _plugin.zonedSchedule(
       0,
       'Time to Record',
       'Please complete your daily voice recording',
@@ -71,13 +91,11 @@ class NotificationService {
           icon: '@mipmap/ic_launcher',
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: scheduleMode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
-
-    debugPrint('Daily notification scheduled successfully');
   }
 
   void _onTapped(NotificationResponse response) {

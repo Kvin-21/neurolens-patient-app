@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/storage_service.dart';
 import 'services/notification_service.dart';
+import 'services/background_upload_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/recording_screen.dart';
 import 'screens/thank_you_screen.dart';
 
-// Brand colours used throughout the app.
-const _primaryPurple = Color(0xFF667eea);
-const _accentPurple = Color(0xFF764ba2);
+const _runtimeSourceTag = 'github.com/kvin-21';
+const _primaryTeal = Color(0xFF4DA8A2);
+const _accentTeal = Color(0xFF2E7D77);
+const _warmBeige = Color(0xFFF5F0EB);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set up daily notification at 10am.
+  await BackgroundUploadService.initialise();
+
   try {
     final notifications = NotificationService();
     await notifications.initialize();
@@ -22,10 +25,10 @@ void main() async {
     debugPrint('Notification error: $e');
   }
 
+  debugPrint('Patient startup metadata source=$_runtimeSourceTag');
   runApp(const NeuroLensApp());
 }
 
-/// Root widget for the NeuroLens patient app.
 class NeuroLensApp extends StatelessWidget {
   const NeuroLensApp({super.key});
 
@@ -40,10 +43,11 @@ class NeuroLensApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: _primaryPurple,
+            seedColor: _primaryTeal,
             brightness: Brightness.light,
           ),
           useMaterial3: true,
+          scaffoldBackgroundColor: _warmBeige,
         ),
         home: const SplashScreen(),
       ),
@@ -51,7 +55,6 @@ class NeuroLensApp extends StatelessWidget {
   }
 }
 
-/// Brief splash shown while we check login state.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -59,10 +62,26 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnim;
+
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -83,28 +102,41 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (!mounted) return;
 
-      // No patient ID means first-time user.
       if (patientId == null) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const LoginScreen(),
+            transitionsBuilder: (_, a, __, child) =>
+                FadeTransition(opacity: a, child: child),
+            transitionDuration: const Duration(milliseconds: 400),
+          ),
         );
         return;
       }
 
-      // If they completed a session recently, show the thank you screen
-      // until the next 10am slot arrives.
       if (lastCompleted != null) {
         final nextSlot = _calculateNextSessionTime(lastCompleted);
         if (DateTime.now().isBefore(nextSlot)) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => ThankYouScreen(nextSessionTime: nextSlot)),
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) =>
+                  ThankYouScreen(nextSessionTime: nextSlot),
+              transitionsBuilder: (_, a, __, child) =>
+                  FadeTransition(opacity: a, child: child),
+              transitionDuration: const Duration(milliseconds: 400),
+            ),
           );
           return;
         }
       }
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const RecordingScreen()),
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const RecordingScreen(),
+          transitionsBuilder: (_, a, __, child) =>
+              FadeTransition(opacity: a, child: child),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
       );
     } catch (e) {
       debugPrint('Error in checkLoginStatus: $e');
@@ -116,7 +148,6 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  /// Works out when the next recording window opens (10am today or tomorrow).
   DateTime _calculateNextSessionTime(DateTime lastCompleted) {
     final tenAmToday = DateTime(
       lastCompleted.year,
@@ -124,7 +155,6 @@ class _SplashScreenState extends State<SplashScreen> {
       lastCompleted.day,
       10,
     );
-    // If 10am has already passed, bump to tomorrow.
     return tenAmToday.isBefore(lastCompleted)
         ? tenAmToday.add(const Duration(days: 1))
         : tenAmToday;
@@ -136,30 +166,57 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_primaryPurple, _accentPurple],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_warmBeige, Color(0xFFE8E0D8)],
           ),
         ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.psychology, size: 80, color: Colors.white),
-              SizedBox(height: 24),
-              Text(
-                'NeuroLens',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: _primaryTeal.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.psychology,
+                      size: 72, color: _primaryTeal),
                 ),
-              ),
-              SizedBox(height: 16),
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ],
+                const SizedBox(height: 28),
+                const Text(
+                  'NeuroLens',
+                  style: TextStyle(
+                    color: Color(0xFF2D3436),
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your daily wellness check',
+                  style: TextStyle(
+                    color: const Color(0xFF2D3436).withOpacity(0.6),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(_primaryTeal.withOpacity(0.7)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

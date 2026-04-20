@@ -10,10 +10,10 @@ import '../widgets/question_card.dart';
 import '../widgets/progress_indicator.dart';
 import 'thank_you_screen.dart';
 
-const _primaryPurple = Color(0xFF667eea);
-const _accentPurple = Color(0xFF764ba2);
+const _primaryTeal = Color(0xFF4DA8A2);
+const _warmBeige = Color(0xFFF5F0EB);
+const _darkText = Color(0xFF2D3436);
 
-/// Main screen where the patient records answers to each question.
 class RecordingScreen extends StatefulWidget {
   const RecordingScreen({super.key});
 
@@ -21,7 +21,8 @@ class RecordingScreen extends StatefulWidget {
   State<RecordingScreen> createState() => _RecordingScreenState();
 }
 
-class _RecordingScreenState extends State<RecordingScreen> {
+class _RecordingScreenState extends State<RecordingScreen>
+    with TickerProviderStateMixin {
   late AudioService _audio;
   StorageService? _storage;
   late MLInterfaceService _ml;
@@ -34,11 +35,25 @@ class _RecordingScreenState extends State<RecordingScreen> {
   bool _isLoading = true;
   String? _error;
 
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _fadeAnim;
+
   @override
   void initState() {
     super.initState();
     _audio = AudioService();
     _ml = MLInterfaceService();
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0.15, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    _fadeAnim = CurvedAnimation(parent: _slideController, curve: Curves.easeOut);
+    _slideController.forward();
     _initAudio();
   }
 
@@ -62,6 +77,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
   @override
   void dispose() {
     _audio.dispose();
+    _slideController.dispose();
     super.dispose();
   }
 
@@ -78,7 +94,6 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
       _questions = _storage!.getDefaultQuestions();
 
-      // Restore partial session if one exists.
       final saved = await _storage!.getCurrentSession();
       if (saved != null && saved.patientId == _patientId) {
         _recordings = List.from(saved.recordings);
@@ -95,10 +110,6 @@ class _RecordingScreenState extends State<RecordingScreen> {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Recording flow
-  // ─────────────────────────────────────────────────────────────────────────
-
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       await _stopAndSave();
@@ -109,14 +120,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
   Future<void> _startRecording() async {
     try {
-      // If re-recording, discard old file first.
       if (_recordings[_questionIndex].audioFile != null) {
         try { await _audio.cancel(); } catch (_) {}
       }
       await _audio.start(_patientId!, _questions[_questionIndex].number);
       setState(() => _isRecording = true);
     } catch (e) {
-      if (mounted) _showToast('Error: $e', Colors.red);
+      if (mounted) _showToast('Error: $e', Colors.red.shade400);
     }
   }
 
@@ -137,10 +147,10 @@ class _RecordingScreenState extends State<RecordingScreen> {
       });
 
       await _persistSession();
-      if (mounted) _showToast('Recording saved ✓', Colors.green);
+      if (mounted) _showToast('Recording saved ✓', _primaryTeal);
     } catch (e) {
       setState(() => _isRecording = false);
-      if (mounted) _showToast('Error: $e', Colors.red);
+      if (mounted) _showToast('Error: $e', Colors.red.shade400);
     }
   }
 
@@ -155,34 +165,37 @@ class _RecordingScreenState extends State<RecordingScreen> {
     await _storage!.saveSession(session);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Navigation
-  // ─────────────────────────────────────────────────────────────────────────
+  void _animateToQuestion(int newIndex) {
+    final goForward = newIndex > _questionIndex;
+    _slideController.reset();
+    _slideAnim = Tween<Offset>(
+      begin: Offset(goForward ? 0.15 : -0.15, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    setState(() => _questionIndex = newIndex);
+    _slideController.forward();
+  }
 
   void _prev() {
     if (_questionIndex > 0 && !_isRecording) {
-      setState(() => _questionIndex--);
+      _animateToQuestion(_questionIndex - 1);
     }
   }
 
   void _next() {
     final recorded = _recordings[_questionIndex].audioFile != null;
     if (_questionIndex < _questions.length - 1 && !_isRecording && recorded) {
-      setState(() => _questionIndex++);
+      _animateToQuestion(_questionIndex + 1);
     }
   }
 
   bool get _allComplete => _recordings.every((r) => r.audioFile != null);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Finish and submit
-  // ─────────────────────────────────────────────────────────────────────────
-
   Future<void> _finish() async {
     if (_storage == null) return;
 
     if (!_allComplete) {
-      _showToast('Please complete all 5 questions', Colors.orange);
+      _showToast('Please complete all 5 questions', Colors.orange.shade600);
       return;
     }
 
@@ -195,35 +208,34 @@ class _RecordingScreenState extends State<RecordingScreen> {
         recordings: _recordings,
       );
 
-      await _storage!.saveSessionManifest(session);
+      final manifestPath = await _storage!.saveSessionManifest(session);
       await _storage!.clearCurrentSession();
 
       final now = DateTime.now();
       await _storage!.saveLastCompletedTime(now);
 
-      // Fire-and-forget ML processing so we don't block the user.
-      Future.delayed(const Duration(milliseconds: 500), () async {
-        try { await _ml.sendToMLModel(session); } catch (_) {}
-      });
-
       if (!mounted) return;
-      Navigator.of(context).pop(); // close dialog
+      Navigator.of(context).pop();
 
       final tomorrow = DateTime(now.year, now.month, now.day + 1, 10);
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => ThankYouScreen(nextSessionTime: tomorrow)),
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => ThankYouScreen(
+            nextSessionTime: tomorrow,
+            sessionManifestPath: manifestPath,
+          ),
+          transitionsBuilder: (_, a, __, child) =>
+              FadeTransition(opacity: a, child: child),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
       );
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop();
-        _showToast('Error: $e', Colors.red);
+        _showToast('Error: $e', Colors.red.shade400);
       }
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  UI helpers
-  // ─────────────────────────────────────────────────────────────────────────
 
   void _showToast(String msg, Color colour) {
     final overlay = Overlay.of(context);
@@ -238,9 +250,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: colour,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, spreadRadius: 2),
+                BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12, spreadRadius: 1),
               ],
             ),
             child: Row(
@@ -265,44 +277,31 @@ class _RecordingScreenState extends State<RecordingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_primaryPurple.withOpacity(0.95), _accentPurple.withOpacity(0.95)],
+      builder: (_) => Center(
+        child: Container(
+          margin: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 30, spreadRadius: 4)],
           ),
-        ),
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.all(40),
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 30, spreadRadius: 10)],
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: CircularProgressIndicator(strokeWidth: 6, valueColor: AlwaysStoppedAnimation<Color>(_primaryPurple)),
-                ),
-                SizedBox(height: 32),
-                Text('Saving recordings...', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryPurple)),
-              ],
-            ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CircularProgressIndicator(strokeWidth: 5, valueColor: AlwaysStoppedAnimation<Color>(_primaryTeal)),
+              ),
+              SizedBox(height: 28),
+              Text('Saving recordings...', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _darkText)),
+            ],
           ),
         ),
       ),
     );
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Build
-  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -315,9 +314,45 @@ class _RecordingScreenState extends State<RecordingScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_primaryPurple, _accentPurple]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_warmBeige, Color(0xFFE8E0D8)],
+          ),
         ),
-        child: const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 200,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: _primaryTeal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: 280,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: _primaryTeal.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(_primaryTeal.withOpacity(0.6)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -326,7 +361,11 @@ class _RecordingScreenState extends State<RecordingScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_primaryPurple, _accentPurple]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_warmBeige, Color(0xFFE8E0D8)],
+          ),
         ),
         child: Center(
           child: Padding(
@@ -334,9 +373,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.white),
+                Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
                 const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.white)),
+                Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: _darkText.withOpacity(0.7))),
               ],
             ),
           ),
@@ -353,41 +392,59 @@ class _RecordingScreenState extends State<RecordingScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_primaryPurple, _accentPurple]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_warmBeige, Color(0xFFE8E0D8)],
+          ),
         ),
         child: SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Patient: $_patientId',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _darkText.withOpacity(0.6)),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               QuestionProgressIndicator(
                 currentQuestion: _questionIndex + 1,
                 completedQuestions: completed,
                 totalQuestions: _questions.length,
               ),
-              const SizedBox(height: 32),
-              QuestionCard(
-                questionText: question.text,
-                questionNumber: question.number,
-                totalQuestions: _questions.length,
+              const SizedBox(height: 28),
+              SlideTransition(
+                position: _slideAnim,
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: QuestionCard(
+                    questionText: question.text,
+                    questionNumber: question.number,
+                    totalQuestions: _questions.length,
+                  ),
+                ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
               RecordingButton(isRecording: _isRecording, isRecorded: recorded, onPressed: _toggleRecording),
-              const SizedBox(height: 16),
-              Text(
-                _isRecording ? 'Recording...' : recorded ? 'Recorded ✓' : 'Tap to record',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+              const SizedBox(height: 14),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Text(
+                  _isRecording ? 'Recording...' : recorded ? 'Recorded ✓' : 'Tap to record',
+                  key: ValueKey(_isRecording ? 'rec' : recorded ? 'done' : 'idle'),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: _isRecording ? Colors.red.shade400 : recorded ? _primaryTeal : _darkText.withOpacity(0.5),
+                  ),
+                ),
               ),
               const Spacer(),
               _buildNavButtons(recorded),
@@ -413,10 +470,12 @@ class _RecordingScreenState extends State<RecordingScreen> {
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Previous'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.9),
-                  foregroundColor: _primaryPurple,
+                  backgroundColor: Colors.white,
+                  foregroundColor: _primaryTeal,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 1,
+                  shadowColor: Colors.black.withOpacity(0.08),
                 ),
               ),
             ),
@@ -426,26 +485,30 @@ class _RecordingScreenState extends State<RecordingScreen> {
             child: isLast
                 ? ElevatedButton.icon(
                     onPressed: _allComplete && !_isRecording ? _finish : null,
-                    icon: const Icon(Icons.check_circle, size: 28),
-                    label: const Text('Complete', style: TextStyle(fontSize: 20)),
+                    icon: const Icon(Icons.check_circle, size: 26),
+                    label: const Text('Complete', style: TextStyle(fontSize: 19)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: _primaryTeal,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       disabledBackgroundColor: Colors.grey.shade300,
+                      elevation: 2,
+                      shadowColor: _primaryTeal.withOpacity(0.3),
                     ),
                   )
                 : ElevatedButton.icon(
                     onPressed: !_isRecording && recorded ? _next : null,
-                    icon: const Icon(Icons.arrow_forward, size: 24),
-                    label: const Text('Next', style: TextStyle(fontSize: 20)),
+                    icon: const Icon(Icons.arrow_forward, size: 22),
+                    label: const Text('Next', style: TextStyle(fontSize: 19)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryPurple,
+                      backgroundColor: _primaryTeal,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       disabledBackgroundColor: Colors.grey.shade300,
+                      elevation: 2,
+                      shadowColor: _primaryTeal.withOpacity(0.3),
                     ),
                   ),
           ),
