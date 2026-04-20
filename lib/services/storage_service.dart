@@ -105,10 +105,10 @@ class StorageService {
 
   /// Hard-coded question set used when ML service isn't connected.
   List<Question> getDefaultQuestions() => [
-    Question(number: 1, text: 'How are you feeling today?'),
-    Question(number: 2, text: 'What did you have for breakfast this morning?'),
-    Question(number: 3, text: 'Tell me about something that made you happy recently.'),
+    Question(number: 1, text: 'What is one thing from your childhood that made you particularly happy during a summer vacation?'),
+    Question(number: 2, text: 'Can you describe a memorable family meal where the dessert really stood out to you?'),
+    Question(number: 3, text: 'What’s something small you did today that helped you unwind or feel at ease?'),
     Question(number: 4, text: 'What activities did you do yesterday?'),
-    Question(number: 5, text: 'Describe the weather outside today.'),
+    Question(number: 5, text: 'Do you remember visiting any favorite places during your childhood summers with family or friends?'),
   ];
 }

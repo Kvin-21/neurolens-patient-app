@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-const _primaryPurple = Color(0xFF667eea);
+const _primaryTeal = Color(0xFF4DA8A2);
+const _darkText = Color(0xFF2D3436);
 
-/// Row of numbered circles showing progress through the questions.
 class QuestionProgressIndicator extends StatelessWidget {
   final int currentQuestion;
   final List<bool> completedQuestions;
@@ -28,32 +28,34 @@ class QuestionProgressIndicator extends StatelessWidget {
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Container(
-              width: 48,
-              height: 48,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              width: isCurrent ? 52 : 44,
+              height: isCurrent ? 52 : 44,
               decoration: BoxDecoration(
                 color: done
-                    ? Colors.green
+                    ? _primaryTeal
                     : isCurrent
                         ? Colors.white
-                        : Colors.white.withOpacity(0.3),
+                        : _primaryTeal.withOpacity(0.08),
                 shape: BoxShape.circle,
                 border: isCurrent && !done
-                    ? Border.all(color: Colors.white, width: 3)
+                    ? Border.all(color: _primaryTeal, width: 2.5)
                     : null,
                 boxShadow: isCurrent
-                    ? [BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)]
+                    ? [BoxShadow(color: _primaryTeal.withOpacity(0.2), blurRadius: 10, spreadRadius: 1)]
                     : null,
               ),
               child: Center(
                 child: done
-                    ? const Icon(Icons.check, color: Colors.white, size: 28)
+                    ? const Icon(Icons.check, color: Colors.white, size: 24)
                     : Text(
                         '$num',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isCurrent ? _primaryPurple : Colors.white.withOpacity(0.7),
+                          color: isCurrent ? _primaryTeal : _darkText.withOpacity(0.35),
                         ),
                       ),
               ),
