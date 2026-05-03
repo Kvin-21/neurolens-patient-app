@@ -23,6 +23,7 @@ dependencies:
   workmanager: ^0.7.0
   encrypt: ^5.0.3
   pointycastle: ^3.9.1
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

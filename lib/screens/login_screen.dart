@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../services/ml_interface_service.dart';
 import '../services/background_upload_service.dart';
 import 'recording_screen.dart';
+import 'caregiver_image_screen.dart';
 
 const _primaryTeal = Color(0xFF4DA8A2);
 const _warmBeige = Color(0xFFF5F0EB);
@@ -125,6 +126,20 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _navigateToCaregiverMode() async {
+    final storage = context.read<StorageService>();
+    final storedId = await storage.getPatientId() ?? '';
+    if (!mounted) return;
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => CaregiverImageScreen(patientId: storedId),
+        transitionsBuilder: (_, a, __, child) =>
+            FadeTransition(opacity: a, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,43 +152,83 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildLogo(),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'NeuroLens',
-                        style: TextStyle(
-                          color: _darkText,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
+          child: Stack(
+            children: [
+              Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(28),
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLogo(),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'NeuroLens',
+                            style: TextStyle(
+                              color: _darkText,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sign in to continue',
+                            style: TextStyle(
+                              color: _darkText.withOpacity(0.5),
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          _buildLoginCard(),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Sign in to continue',
-                        style: TextStyle(
-                          color: _darkText.withOpacity(0.5),
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      _buildLoginCard(),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+              Positioned(
+                top: 10,
+                left: 16,
+                child: _buildCaregiverToggle(),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCaregiverToggle() {
+    return GestureDetector(
+      onTap: _navigateToCaregiverMode,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade600,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.supervisor_account, color: Colors.white, size: 15),
+            SizedBox(width: 5),
+            Text(
+              'Caregiver',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
         ),
       ),
     );
