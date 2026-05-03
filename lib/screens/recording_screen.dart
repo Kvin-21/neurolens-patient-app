@@ -432,7 +432,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                 ),
               ),
               const SizedBox(height: 36),
-              RecordingButton(isRecording: _isRecording, isRecorded: recorded, onPressed: _toggleRecording),
+              RecordingButton(isRecording: _isRecording, isRecorded: recorded, onPressed: _toggleRecording, amplitudeStream: _isRecording ? _audio.amplitudeStream : null),
               const SizedBox(height: 14),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
