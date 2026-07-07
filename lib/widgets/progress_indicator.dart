@@ -31,8 +31,8 @@ class QuestionProgressIndicator extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
-              width: isCurrent ? 52 : 44,
-              height: isCurrent ? 52 : 44,
+              width: isCurrent ? 42 : 36,
+              height: isCurrent ? 42 : 36,
               decoration: BoxDecoration(
                 color: done
                     ? _primaryTeal
@@ -49,11 +49,11 @@ class QuestionProgressIndicator extends StatelessWidget {
               ),
               child: Center(
                 child: done
-                    ? const Icon(Icons.check, color: Colors.white, size: 24)
+                    ? const Icon(Icons.check, color: Colors.white, size: 20)
                     : Text(
                         '$num',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: isCurrent ? _primaryTeal : _darkText.withOpacity(0.35),
                         ),

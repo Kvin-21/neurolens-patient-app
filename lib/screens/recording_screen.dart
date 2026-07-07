@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'login_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/storage_service.dart';
-import '../services/ml_interface_service.dart';
 import '../models/recording_session.dart';
 import '../models/question.dart';
 import '../widgets/recording_button.dart';
@@ -25,7 +28,6 @@ class _RecordingScreenState extends State<RecordingScreen>
     with TickerProviderStateMixin {
   late AudioService _audio;
   StorageService? _storage;
-  late MLInterfaceService _ml;
 
   String? _patientId;
   List<Question> _questions = [];
@@ -33,6 +35,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   List<RecordingEntry> _recordings = [];
   bool _isRecording = false;
   bool _isLoading = true;
+  bool _isQrScanning = false;
   String? _error;
 
   late AnimationController _slideController;
@@ -43,7 +46,6 @@ class _RecordingScreenState extends State<RecordingScreen>
   void initState() {
     super.initState();
     _audio = AudioService();
-    _ml = MLInterfaceService();
     _slideController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
@@ -237,6 +239,14 @@ class _RecordingScreenState extends State<RecordingScreen>
     }
   }
 
+  Future<void> _logout() async {
+    if (_storage != null) await _storage!.clearPatientId();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
   void _showToast(String msg, Color colour) {
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(
@@ -402,7 +412,7 @@ class _RecordingScreenState extends State<RecordingScreen>
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -410,50 +420,153 @@ class _RecordingScreenState extends State<RecordingScreen>
                       'Patient: $_patientId',
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _darkText.withOpacity(0.6)),
                     ),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: _isRecording ? null : _showQrScanner,
+                          icon: const Icon(Icons.qr_code_scanner),
+                          color: _darkText.withOpacity(0.7),
+                          tooltip: 'Scan QR code',
+                        ),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: _logout,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade400,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.logout, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              QuestionProgressIndicator(
-                currentQuestion: _questionIndex + 1,
-                completedQuestions: completed,
-                totalQuestions: _questions.length,
-              ),
-              const SizedBox(height: 28),
-              SlideTransition(
-                position: _slideAnim,
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: QuestionCard(
-                    questionText: question.text,
-                    questionNumber: question.number,
-                    totalQuestions: _questions.length,
-                  ),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.topCenter,
+                              child: SizedBox(
+                                width: MediaQuery.of(context).size.width,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(height: 2),
+                                    QuestionProgressIndicator(
+                                      currentQuestion: _questionIndex + 1,
+                                      completedQuestions: completed,
+                                      totalQuestions: _questions.length,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SlideTransition(
+                                      position: _slideAnim,
+                                      child: FadeTransition(
+                                        opacity: _fadeAnim,
+                                        child: QuestionCard(
+                                          questionText: question.text,
+                                          questionNumber: question.number,
+                                          totalQuestions: _questions.length,
+                                          imageAssetPath: _questionImageFor(question.number),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Center(
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(maxWidth: 220),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            RecordingButton(
+                                              isRecording: _isRecording,
+                                              isRecorded: recorded,
+                                              onPressed: _toggleRecording,
+                                              amplitudeStream: _isRecording ? _audio.amplitudeStream : null,
+                                            ),
+                                            const SizedBox(height: 18),
+                                            AnimatedSwitcher(
+                                              duration: const Duration(milliseconds: 250),
+                                              child: Text(
+                                                _isRecording ? 'Recording...' : recorded ? 'Recorded ✓' : 'Tap to record',
+                                                key: ValueKey(_isRecording ? 'rec' : recorded ? 'done' : 'idle'),
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _isRecording ? Colors.red.shade400 : recorded ? _primaryTeal : _darkText.withOpacity(0.5),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildNavButtons(recorded),
+                    const SizedBox(height: 10),
+                  ],
                 ),
               ),
-              const SizedBox(height: 36),
-              RecordingButton(isRecording: _isRecording, isRecorded: recorded, onPressed: _toggleRecording, amplitudeStream: _isRecording ? _audio.amplitudeStream : null),
-              const SizedBox(height: 14),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: Text(
-                  _isRecording ? 'Recording...' : recorded ? 'Recorded ✓' : 'Tap to record',
-                  key: ValueKey(_isRecording ? 'rec' : recorded ? 'done' : 'idle'),
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: _isRecording ? Colors.red.shade400 : recorded ? _primaryTeal : _darkText.withOpacity(0.5),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              _buildNavButtons(recorded),
-              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
+  }
+
+  String? _questionImageFor(int number) {
+    if (number == 1 || number == 2) {
+      return 'assets/images/imgs/Image of an elderly having a jolly good time on the beach!.png';
+    }
+    if (number == 3 || number == 4) {
+      return 'assets/images/imgs/Family gathering in a garden setting.png';
+    }
+    return null;
+  }
+
+  Future<void> _showQrScanner() async {
+    if (_isQrScanning) return;
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+    if (!status.isGranted) {
+      _showToast('Camera permission is needed to scan QR codes', Colors.red.shade400);
+      return;
+    }
+
+    setState(() => _isQrScanning = true);
+    final success = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _QrScanDialog(),
+    );
+
+    if (mounted) {
+      setState(() => _isQrScanning = false);
+    }
+
+    if (success == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Private key captured successfully.')),
+      );
+    }
   }
 
   Widget _buildNavButtons(bool recorded) {
@@ -472,8 +585,8 @@ class _RecordingScreenState extends State<RecordingScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: _primaryTeal,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 1,
                   shadowColor: Colors.black.withOpacity(0.08),
                 ),
@@ -485,13 +598,13 @@ class _RecordingScreenState extends State<RecordingScreen>
             child: isLast
                 ? ElevatedButton.icon(
                     onPressed: _allComplete && !_isRecording ? _finish : null,
-                    icon: const Icon(Icons.check_circle, size: 26),
-                    label: const Text('Complete', style: TextStyle(fontSize: 19)),
+                    icon: const Icon(Icons.check_circle, size: 22),
+                    label: const Text('Complete', style: TextStyle(fontSize: 16)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryTeal,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       disabledBackgroundColor: Colors.grey.shade300,
                       elevation: 2,
                       shadowColor: _primaryTeal.withOpacity(0.3),
@@ -499,13 +612,13 @@ class _RecordingScreenState extends State<RecordingScreen>
                   )
                 : ElevatedButton.icon(
                     onPressed: !_isRecording && recorded ? _next : null,
-                    icon: const Icon(Icons.arrow_forward, size: 22),
-                    label: const Text('Next', style: TextStyle(fontSize: 19)),
+                    icon: const Icon(Icons.arrow_forward, size: 20),
+                    label: const Text('Next', style: TextStyle(fontSize: 16)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryTeal,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       disabledBackgroundColor: Colors.grey.shade300,
                       elevation: 2,
                       shadowColor: _primaryTeal.withOpacity(0.3),
@@ -513,6 +626,113 @@ class _RecordingScreenState extends State<RecordingScreen>
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QrScanDialog extends StatefulWidget {
+  const _QrScanDialog();
+
+  @override
+  State<_QrScanDialog> createState() => _QrScanDialogState();
+}
+
+class _QrScanDialogState extends State<_QrScanDialog> {
+  late final MobileScannerController _controller;
+  bool _completed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _complete() {
+    if (_completed) return;
+    _completed = true;
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Scanning QR Code',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _darkText),
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 210,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    MobileScanner(
+                      controller: _controller,
+                      onDetect: (capture) {
+                        if (capture.barcodes.isNotEmpty) {
+                          _complete();
+                        }
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        height: 120,
+                        width: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Hold steady to capture the private key',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _darkText.withOpacity(0.6)),
+            ),
+            const SizedBox(height: 12),
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ),
       ),
     );
   }

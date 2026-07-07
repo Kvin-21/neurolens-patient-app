@@ -107,8 +107,8 @@ class StorageService {
   List<Question> getDefaultQuestions() => [
     Question(number: 1, text: 'What is one thing from your childhood that made you particularly happy during a summer vacation?'),
     Question(number: 2, text: 'Can you describe a memorable family meal where the dessert really stood out to you?'),
-    Question(number: 3, text: 'What’s something small you did today that helped you unwind or feel at ease?'),
-    Question(number: 4, text: 'What activities did you do yesterday?'),
-    Question(number: 5, text: 'Do you remember visiting any favorite places during your childhood summers with family or friends?'),
+    Question(number: 3, text: 'Can you recall a happy conversation you had with your family during a meal?'),
+    Question(number: 4, text: 'What was one peaceful activity you enjoyed doing with your loved ones?'),
+    Question(number: 5, text: 'What’s something small you did today that helped you unwind or feel at ease?'),
   ];
 }

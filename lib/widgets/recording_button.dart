@@ -101,8 +101,8 @@ class _RecordingButtonState extends State<RecordingButton>
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 220,
-            height: 160,
+            width: 186,
+            height: 146,
             child: AnimatedBuilder(
               animation: Listenable.merge([_scale, _waveController]),
               builder: (_, __) => Center(
@@ -111,8 +111,8 @@ class _RecordingButtonState extends State<RecordingButton>
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
-                    width: 160,
-                    height: 160,
+                    width: 138,
+                    height: 138,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
@@ -141,7 +141,7 @@ class _RecordingButtonState extends State<RecordingButton>
                     ),
                     child: Icon(
                       widget.isRecording ? Icons.stop_rounded : Icons.mic,
-                      size: 60,
+                      size: 50,
                       color: Colors.white,
                     ),
                   ),
@@ -149,7 +149,7 @@ class _RecordingButtonState extends State<RecordingButton>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           if (widget.isRecording)
             AnimatedBuilder(
               animation: Listenable.merge([_waveController]),
@@ -158,7 +158,7 @@ class _RecordingButtonState extends State<RecordingButton>
                   time: _waveController.value,
                   amplitude: _procAmplitude,
                 ),
-                size: const Size(220, 50),
+                size: const Size(176, 34),
               ),
             ),
         ],
